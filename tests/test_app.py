@@ -36,6 +36,17 @@ class FakeClient:
         self.models = FakeModels(answer)
 
 
+class FakeDatabaseDriver:
+    def __init__(self):
+        self.statements = []
+
+    def execute(self, query, parameters=()):
+        self.statements.append((query, parameters))
+
+    def executemany(self, query, parameters):
+        self.statements.append((query, parameters))
+
+
 class SplitTextTests(unittest.TestCase):
     def test_splits_long_text_with_overlap(self):
         text = "abcdefghij klmnopqrst uvwxyz"
@@ -128,6 +139,27 @@ class IndexingTests(unittest.TestCase):
                         ).fetchone()["value"]
 
         self.assertEqual(stored_model, "new-gemini-embedding")
+
+
+class DeploymentTests(unittest.TestCase):
+    def test_postgres_adapter_translates_placeholders(self):
+        driver = FakeDatabaseDriver()
+        connection = app.DatabaseConnection(driver, is_postgres=True)
+
+        connection.execute("SELECT * FROM documents WHERE id = ?", ("id",))
+
+        self.assertEqual(
+            driver.statements,
+            [("SELECT * FROM documents WHERE id = %s", ("id",))],
+        )
+
+    def test_hosted_app_requires_api_key_and_persistent_database(self):
+        settings = {"GEMINI_API_KEY": "key", "DATABASE_URL": "postgresql://db"}
+
+        with patch.object(app, "get_setting", side_effect=settings.get):
+            self.assertTrue(app.app_is_configured())
+        with patch.object(app, "get_setting", return_value=None):
+            self.assertFalse(app.app_is_configured())
 
 
 if __name__ == "__main__":

@@ -96,9 +96,17 @@ def get_setting(name: str) -> str | None:
     if value:
         return value
     try:
-        return st.secrets.get(name)
+        value = st.secrets.get(name)
+        return str(value) if value is not None else None
     except st.errors.StreamlitSecretNotFoundError:
         return None
+
+
+def app_is_configured() -> bool:
+    has_gemini_key = bool(get_setting("GEMINI_API_KEY"))
+    has_database = bool(get_setting("DATABASE_URL"))
+    allow_local_sqlite = (get_setting("ALLOW_LOCAL_SQLITE") or "").lower() == "true"
+    return has_gemini_key and (has_database or allow_local_sqlite)
 
 
 @contextmanager
@@ -589,6 +597,19 @@ def main() -> None:
         "Public shared demo: uploaded documents, indexed passages, and chat history "
         "are shared with everyone who can access this app."
     )
+    configured = app_is_configured()
+    if not configured:
+        missing_settings = []
+        if not get_setting("GEMINI_API_KEY"):
+            missing_settings.append("GEMINI_API_KEY")
+        if not get_setting("DATABASE_URL") and (
+            get_setting("ALLOW_LOCAL_SQLITE") or ""
+        ).lower() != "true":
+            missing_settings.append("DATABASE_URL")
+        st.info(
+            "Configure " + " and ".join(missing_settings)
+            + " in Streamlit app settings → Secrets to enable uploads and questions."
+        )
 
     if "conversation_id" not in st.session_state:
         st.session_state.conversation_id = None
@@ -599,9 +620,12 @@ def main() -> None:
             "Upload PDF, DOCX, or TXT files",
             type=["pdf", "docx", "txt"],
             accept_multiple_files=True,
+            disabled=not configured,
         )
         if st.button(
-            "Index documents", disabled=not uploads, use_container_width=True
+            "Index documents",
+            disabled=not uploads or not configured,
+            use_container_width=True,
         ):
             try:
                 client = get_client()
@@ -665,7 +689,9 @@ def main() -> None:
     else:
         st.info("Upload and index documents, then ask a question to get started.")
 
-    question = st.chat_input("Ask a question about your documents")
+    question = st.chat_input(
+        "Ask a question about your documents", disabled=not configured
+    )
     if not question or not question.strip():
         return
 

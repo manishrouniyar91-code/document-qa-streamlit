@@ -40,6 +40,7 @@ the same file contents does not create duplicate indexed documents.
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` | Model used for semantic search |
 | `DATABASE_URL` | — | Optional PostgreSQL connection URL; required for durable hosted storage |
 | `DATABASE_PATH` | `data/qa_history.db` | Local SQLite database path when `DATABASE_URL` is not set |
+| `ALLOW_LOCAL_SQLITE` | unset | Set to `true` for local SQLite development when `DATABASE_URL` is unset |
 
 Uploaded file contents are sent to the configured Gemini models for embedding
 and answer generation. The app stores extracted passages and their embeddings,
@@ -59,8 +60,8 @@ re-embeds the stored passages using the configured Gemini embedding model.
    `?sslmode=require`). On first start, the app creates the required tables.
 
 The app falls back to local SQLite when `DATABASE_URL` is not set; that local
-database is not durable on a hosted instance. Add the hosted database secret
-before accepting uploads.
+database is not durable on a hosted instance. The hosted app disables uploads
+and questions until both required secrets are configured.
 
 This deployment is a public shared demo: all visitors share its documents,
 indexed content, and conversation history. Do not use it for private documents
